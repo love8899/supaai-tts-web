@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+*.log
+public/audio/
+public/*.mp3
+.DS_Store
+.vscode/
+.idea/
