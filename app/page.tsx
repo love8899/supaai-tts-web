@@ -1,6 +1,14 @@
 "use client";
 
+// add reCapture
+
+//import ReCAPTCHA from "react-google-recaptcha";
+
+
 import { useMemo, useRef, useState } from "react";
+
+
+
 
 const VOICES = [
   { id: "en-US-JennyNeural", label: "Jenny (US) - Natural" },
@@ -52,7 +60,9 @@ function estimateDurationSeconds(text: string, rate: string) {
   return seconds + 1.5;
 }
 
+// home function
 export default function Home() {
+
   const [text, setText] = useState("Welcome to SupaAI Cloud Text to Speech.");
   const [voice, setVoice] = useState(VOICES[0].id);
   const [rate, setRate] = useState(RATES[0].id);
@@ -63,6 +73,8 @@ export default function Home() {
  // add hooks
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  // add captcha
+
 
 
   // progress UI (simulated while backend works)
@@ -99,58 +111,66 @@ export default function Home() {
     setProgress(0);
   }
 
+  // function generate
   async function generate() {
-    setError(null);
-    setLoading(true);
-    startProgress();
+  setError(null);
+  setLoading(true);
+  startProgress();
 
-    try {
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice, rate }),
-      });
-
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || "TTS failed");
-      }
-
-     // const blob = await res.blob();
-     // setAudioUrl(URL.createObjectURL(blob));
-     
-     const blob = await res.blob();
-
-   // revoke ONLY the previous blob url (from ref, not state)
-if (blobUrlRef.current) {
-  URL.revokeObjectURL(blobUrlRef.current);
-  blobUrlRef.current = null;
-}
-
-const newUrl = URL.createObjectURL(blob);
-blobUrlRef.current = newUrl;
-setAudioUrl(newUrl);
-    
-    // force audio to reload the new source (Chrome fix)
-setTimeout(() => {
-  if (!audioRef.current) return;
-  audioRef.current.load();
-  audioRef.current.currentTime = 0;
-  audioRef.current.play().catch(() => {});
-}, 50); 
-   
-
-      stopProgressSuccess();
-    } catch (e: any) {
-      setError(e?.message ?? "Unknown error");
-      setAudioUrl(null);
-      stopProgressFail();
-    } finally {
-      setLoading(false);
+  try {
+    // 1) Create v3 token on-demand
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!;
+    if (!window.grecaptcha) {
+      throw new Error("reCAPTCHA not loaded. Refresh the page and try again.");
     }
+
+    const recaptchaToken = await window.grecaptcha.execute(siteKey, {
+      action: "tts_generate",
+    });
+
+    // 2) Call your API with token
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice, rate, recaptchaToken }),
+    });
+
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(msg || "TTS failed");
+    }
+
+    const blob = await res.blob();
+
+    // revoke ONLY the previous blob url (from ref, not state)
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
+    const newUrl = URL.createObjectURL(blob);
+    blobUrlRef.current = newUrl;
+    setAudioUrl(newUrl);
+
+    // force audio to reload the new source (Chrome fix)
+    setTimeout(() => {
+      if (!audioRef.current) return;
+      audioRef.current.load();
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }, 50);
+
+    stopProgressSuccess();
+  } catch (e: any) {
+    setError(e?.message ?? "Unknown error");
+    setAudioUrl(null);
+    stopProgressFail();
+  } finally {
+    setLoading(false);
   }
+}
 
   function download() {
     if (!audioUrl) return;
@@ -254,6 +274,8 @@ setTimeout(() => {
               </div>
             </div>
 
+
+
             <button
               className="mt-6 w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               onClick={generate}
@@ -303,7 +325,7 @@ setTimeout(() => {
       blobUrlRef.current = null;
     }
     setAudioUrl(null);
-  }}    
+  }}
 		  className="rounded-xl bg-slate-950 px-4 py-2 text-sm text-slate-300 ring-1 ring-slate-800 hover:bg-slate-900"
                     >
                       Clear
